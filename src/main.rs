@@ -9,7 +9,7 @@ fn main() {
     
     let board = make_board(BOARD_LEN);
 
-    // Player init board placement
+    // Player init board placement is outside
     let mut current_place: usize = 0;
     let mut first_roll = true;
 
@@ -23,7 +23,7 @@ fn main() {
         let roll: usize = [rolls.0, rolls.1].iter().sum();
         let turn: PlayerTurn = PlayerTurn { current_place, roll };
 
-        println!("⏭ {:?}", turn);
+        println!("\t>>> {:?}", turn);
 
         // 2. Find next place to move in the board
         let next_place = match find_next_place(&turn, first_roll) {
@@ -55,8 +55,9 @@ enum Place {
     Safe
 }
 
+#[derive(Debug)]
 enum NextPlace {
-    Place(usize),
+    Place(usize), // Place index
     Goal
 }
 
@@ -94,7 +95,6 @@ fn make_board(len: usize) -> Board {
 }
 
 /*  */
-// min 7
 fn print_board(player_place: &usize, board: &Board) -> () {
     
     let mut board_display: Vec<String> = vec![];
@@ -106,17 +106,17 @@ fn print_board(player_place: &usize, board: &Board) -> () {
             Place::Safe => SAFE_SPACE.to_string()
         };
 
-        if i == *player_place { board_display.push(format!(">{}<", i)); }
+        if i == *player_place { board_display.push(format!(">{}<", i+1)); }
         else                  { board_display.push(display); }
     }
 
-    println!("🎬 {:?}", board_display)
+    println!("{:?}", board_display)
 }
 
 /*  */
 fn roll(dice_1: Range<usize>, dice_2: Range<usize>) -> Rolls {
     
-    println!("🎲🎲 Roll two dice…");
+    println!("{{#}}{{#}} Roll two dice…");
 
     // Just for waiting, not actually using input
     io::stdin()
@@ -143,11 +143,12 @@ fn move_player(board: &Board, next_place: usize) -> usize {
 
     match place {
         Some(Place::Obstacle(penalty)) => {
-            let penalty_place = next_place - penalty;
 
-            match penalty_place.cmp(&0) {
-                Ordering::Less => 0,
-                _ => penalty_place
+            println!("A monster appeared at {}, you move {} steps back to survive:", next_place + 1, penalty);
+
+            match next_place.cmp(penalty) {
+                Ordering::Less => 0, // Don't go outside board
+                _ => next_place - *penalty
             }
         },
         Some(Place::Safe) => next_place,
