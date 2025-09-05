@@ -1,20 +1,20 @@
 use std::{io, cmp::Ordering, ops::Range};
-use rand::Rng;
+use rand;
+use std::fmt;
 
-const OBSTACLE: &str = "┗| `O′|┛";
-const SAFE_SPACE: &str = "_";
+
 const BOARD_LEN: usize = 32;
 
 fn main() {
     
-    let board = make_board(BOARD_LEN);
+    let mut board = make_board(BOARD_LEN);
 
     // Player init board placement is outside
     let mut current_place: usize = 0;
     let mut first_roll = true;
 
     // Display board without the player current place
-    print_board(&board.len(), &board);
+    println!("{}", board);
 
     'pitfall: loop {
         
@@ -23,49 +23,91 @@ fn main() {
         let roll: usize = [rolls.0, rolls.1].iter().sum();
         let turn: PlayerTurn = PlayerTurn { current_place, roll };
 
-        println!("\t>>> {:?}", turn);
+        println!("{}", turn);
 
         // 2. Find next place to move in the board
-        let next_place = match find_next_place(&turn, first_roll) {
+        let find_next_place = find_next_place(&turn, first_roll);
+        println!("Next place position:{}", find_next_place);
+
+        let next_place = match find_next_place {
             NextPlace::Place(p) => p,
             NextPlace::Goal => break 'pitfall
-        };
-
+        };    
+        
         // 3. Move player
-        current_place = move_player(&board, next_place);
+        current_place = move_player(&mut board, next_place);
         
         // 4. Print board
-        print_board(&current_place, &board);
+        println!("{}", board);
 
         first_roll = false;
         println!("======\n");
     }
+
+    println!("You Won!\n");
 }
 
 
 // 
 /*  */
 
-type Board = Vec<Place>;
 type Rolls = (usize, usize);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 enum Place {
     Obstacle(usize), // obstacle with # steps back (penalty)
     Safe
 }
+impl fmt::Display for Place {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 
-#[derive(Debug)]
+        match self {
+            Self::Obstacle(penatly) => writeln!(f, "   ┗| `O′|┛{}", penatly),
+            Self::Safe => writeln!(f, "    |[  ]|")
+        }
+    }
+}
+
 enum NextPlace {
     Place(usize), // Place index
     Goal
 }
+impl fmt::Display for NextPlace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Place(position) => writeln!(f, "   |[ {} ]|", position),
+            Self::Goal => writeln!(f, "   |[<*>]|")
+        }
+    }
+}
 
-#[derive(Debug)]
+struct Board{
+    board: Vec<Place>,
+    player_pos: usize
+}
+impl fmt::Display for Board {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+
+        for (i, &place) in self.board.iter().enumerate() {
+
+            if i == self.player_pos { writeln!(f, "P-|[ >{}< ]|", i)?; }
+            else                    { write!(f, "{}", place)?; }
+        }
+
+        writeln!(f, "---")
+    }
+}
+
 struct PlayerTurn {
     current_place: usize,
     roll: usize
 }
+impl fmt::Display for PlayerTurn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, ">>> Player Turn\n    >{}< | {{#{}}}", self.current_place, self.roll)
+    }
+}
+
 
 
 // 
@@ -73,7 +115,7 @@ struct PlayerTurn {
 fn make_board(len: usize) -> Board {
     
     let mut i = 0;
-    let mut board : Board = vec![];
+    let mut board = vec![];
 
     while i < len {
 
@@ -91,26 +133,7 @@ fn make_board(len: usize) -> Board {
         i+=1;
     }
 
-    board
-}
-
-/*  */
-fn print_board(player_place: &usize, board: &Board) -> () {
-    
-    let mut board_display: Vec<String> = vec![];
-
-    for (i, &place) in board.iter().enumerate() {
-
-        let display = match place {
-            Place::Obstacle(_) => OBSTACLE.to_string(),
-            Place::Safe => SAFE_SPACE.to_string()
-        };
-
-        if i == *player_place { board_display.push(format!(">{}<", i+1)); }
-        else                  { board_display.push(display); }
-    }
-
-    println!("{:?}", board_display)
+    Board { board, player_pos: 0 }
 }
 
 /*  */
@@ -137,21 +160,36 @@ fn find_next_place(turn: &PlayerTurn, first_roll: bool) -> NextPlace {
 }
 
 /*  */
-fn move_player(board: &Board, next_place: usize) -> usize {
+fn move_player(board: &mut Board, next_place: usize) -> usize {
     
-    let place = board.get(next_place);
+    let some_place = board.board.get(next_place);
 
-    match place {
-        Some(Place::Obstacle(penalty)) => {
+    match some_place {
+        Some(p@Place::Obstacle(penalty)) => {
 
-            println!("A monster appeared at {}, you move {} steps back to survive:", next_place + 1, penalty);
+            println!("A monster appeared at {}, you move {} steps back to survive:", next_place, penalty);
+            println!("{}", p);
 
             match next_place.cmp(penalty) {
                 Ordering::Less => 0, // Don't go outside board
-                _ => next_place - *penalty
+                _ => {
+                    // Update player board position
+                    let penatly_place = next_place - *penalty;
+                    board.player_pos = penatly_place;
+
+                    penatly_place
+                }
             }
         },
-        Some(Place::Safe) => next_place,
-        None => next_place,
+        Some(p@Place::Safe) => {
+            println!("Next Place is safe!:{}", p);
+            board.player_pos = next_place;
+            next_place
+        },
+        None => {
+            println!("None place");
+            board.player_pos = next_place;
+            next_place
+        }
     }
 }
